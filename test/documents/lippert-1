@@ -1,0 +1,105 @@
+Last time on FAIC I discussed the standard terminology used for the monad pattern: that the simple construction method is traditionally called "unit", and the function application method is traditionally called "bind". I also pointed out that the two sub-patterns you see most frequently in implementations of the monad pattern are first, association of some state with a value, and second, construction of workflows that describe the sequencing of units of work to be performed in the future. Today we'll look at that first kind of monad in some more detail.
+
+We've been talking extensively about the nullable monad; it essentially associates a single Boolean value with the underlying value. If the Boolean value is true then the value behaves normally; if not, then the "nullness" of the value propagates through the system. 1 I won't labour that example more. Rather, let's look at two variations on the nullable monad:
+
+struct Tainted<T>
+{
+  public T Value { get; private set; }
+  public bool IsTainted { get; private set; }
+  private Tainted(T value, bool isTainted) : this()
+  {
+    this.Value = value;
+    this.IsTainted = isTainted;
+  }
+  public static Tainted<T> MakeTainted(T value)
+  {
+    return new Tainted<T>(value, true);
+  }
+  public static Tainted<T> MakeClean(T value)
+  {
+    return new Tainted<T>(value, false);
+  }
+  public static Tainted<R> Bind<A, R>(
+    Tainted<A> tainted, Func<A, Tainted<R>> function)
+  {
+    Tainted<R> result = function(tainted.Value);
+    if (tainted.IsTainted && !result.IsTainted)
+      return new Tainted<R>(result.Value, true);
+    else
+      return result;
+  }
+}
+
+(Note that I've started calling the bind function "Bind" rather than "ApplySpecialFunction".)
+
+The semantics of this monad should be pretty clear. We associated a "taint" with a value, and any function that takes as its argument a "dirty" value results in an automatically dirty value. Or, put another way, the only way for a function applied to an instance of this monad can result in a clean result is if the original value was clean and the function produced a clean value. You could use this monad to "amplify" a string so that you could determine if it had been checked for cross-site scripting attacks; strings are presumed dirty until proven clean, and any operation on a dirty string produces another dirty string.
+
+This example was very simple; you might imagine that the "security" state stored here could be far more complex. Rather than a simple Boolean taint, the taint might be an identifier determining which client originated the data. Anything is possible.
+
+Here's a second variation on the nullable monad:
+
+struct NoThrow<T>
+{
+  private T value;
+  public T Value 
+  {
+    get
+    {
+      if (this.Exception != null)
+        throw this.Exception;
+      else
+        return this.Value;
+    }
+  }
+  public Exception Exception { get; private set; }
+  private NoThrow(T value, Exception exception) : this()
+  {
+    this.value = value;
+    this.Exception = exception;
+  }
+  public NoThrow(T value) : this(value, null) {}
+  public static NoThrow<R> Bind<A, R>(
+    NoThrow<A> noThrow, Func<A, NoThrow<R>> function)
+  {
+    if (noThrow.Exception != null)
+      return new NoThrow<R>(default(R), noThrow.Exception);
+    R newValue;
+    try
+    {
+      newValue = function(noThrow.Value));
+    }
+    catch(Exception ex)
+    {
+      return new NoThrow<R>(default(R), ex);
+    }
+    return new NoThrow<R>(newValue, null);
+  }
+}
+
+Again, the semantics should be pretty clear; this is a buffed-up version of the nullable monad, where a value is "null" if any operation that produced it threw an exception. This monad will be very familiar to anyone who has used the asynchronous monad Task<T> because of course it does much the same thing: if the asynchronous task throws an exception then the exception is stored in the task, and re-thrown when the value of the task is fetched.2
+
+You can associate any kind of state whatsoever with a value using a monad. For example, for debugging purposes we might want to accumulate a log describing how it flowed through the program:
+
+struct Logged<T>
+{
+  public T Value { get; private set; } 
+  public string Log { get; private set; }
+  public Logged(T value, string log) : this()
+  {
+    this.value = value;
+    this.log = log;
+  }
+  public Logged(T value) : this(value, null) {}
+  public Logged<T> AddLog(string newLog) 
+  {
+    return new Logged(this.value, this.log + newLog);
+  }  
+  public static Logged<R> Bind<A, R>(
+    Logged<A> logged, Func<A, Logged<R>> function)
+  {
+    Logged result = function(logged.Value);
+    return new Logged(result.Value, logged.Log + result.Log);
+  }
+}
+
+These are just some of the simpler "associate data with a value" monads that are possible, but I suspect that you get the idea. Next time on FAIC we'll take a closer look at query expression syntax; it turns out to have a strong connection with monadic binding.

@@ -1,0 +1,102 @@
+Way back in 1992 I was studying linear algebra at Waterloo. I just could not seem to wrap my head around dual spaces. Then one night I went to sleep after studying algebra for several hours, and I dreamed about dual spaces. When I awoke I had a clear and intuitive understanding of the concept. Apparently my brain had decided to sort it all out in my sleep. It was a bizarre experience that never happened again.1 History is full of examples of people who had sudden insights that solved tricky problems. The tragically short-lived mathematician Srinivasa Ramanujan claimed that he dreamed of vast scrolls of mathematics, most of which turned out to be both correct and strikingly original.
+
+There is of course a difficulty with waiting for a solution to appear in a dream: you never know when that's going to happen. Since insight is unreliable, we've developed a far more reliable technique for solving tough problems: recursive divide and conquer. We solve problems the same way that a recursive method solves problems:
+
+    Is the current problem trivial? If so, solve it. Otherwise, break the current problem down into one or more smaller problems. Recursively solve the smaller problems and then compose those solutions into a solution to the larger problem.
+
+It's "composition" that I want to talk about today. Composition is the act of combining two or more solutions to smaller problems into a single abstraction that solves a larger problem. We do this so often when writing computer programs, it's like the air we breathe. It's all around us but we don't think about it that often. Here we have a composition of two properties with an operator; the result of the composition is a third property:
+
+public double Area
+{
+  get { return this.Length * this.Width; }
+}
+
+And of course whatever Rectangle type this is has probably composed two values of Point type for the corners, which have in turn composed two double values for the coordinates, and so on. All the mechanisms of a modern, pragmatic programming language are there to make it easy to compose solutions to smaller problems into solutions of larger problems.
+
+Thus there are an enormous number of different kinds of composition available to C# programmers. Today I want to talk about a very specific kind of composition: composition of non-void functions of one parameter. This is one of the most basic of compositions.2 As a silly illustrative example, if you have:
+
+static long Cube(int x) { return (long)x * x * x; }
+static double Halve(long y) { return y / 2.0; }
+
+then you can always make a third function that composes these two:
+
+static double HalveTheCube(int x) { return Halve(Cube(x)); }
+
+Typically when we write programs, the program text itself describes a whole pile of compositions, each rather more complex than these simple function-of-one-parameter compositions. But we can also perform function compositions dynamically if we want to, using delegates:
+
+Func<int, long> cube = x => (long)x * x * x;
+Func<long, double> halve = y => y / 2.0;
+Func<int, double> both = z => halve(cube(z));
+
+And in fact, we could even make a method that does it for us:
+
+static Func<X, Z> Compose<X, Y, Z>(
+  Func<X, Y> f,
+  Func<Y, Z> g)
+{ 
+  return x => g(f(x));
+}
+
+And then we could say:
+
+Func<int, long> cube = x => (long)x * x * x;
+Func<long, double> halve = y => y / 2.0; 
+Func<int, double> both = Compose(cube, halve);
+
+Of course you would never actually do that, because function composition has such a lovely syntax already in C#. But logically, this is what you are doing every time you write a program where the result of one function is fed into the next: you are composing the two functions into a third.
+
+Notice that of course in order to be composed, the return type of the "inner" function must be implicitly convertible to the parameter type of the "outer" function. Which brings us back to the topic at hand: the final rule of the monad pattern for types. We've been talking about "special" functions that return an instance of a monadic type. Suppose we have two such functions:
+
+Func<int, Nullable<double>> log = x => x > 0 ? 
+  new Nullable<double>(Math.Log(x)) : new Nullable<double>();
+Func<double, Nullable<decimal>> toDecimal = y => Math.Abs(y) < decimal.MaxValue : 
+  new Nullable<decimal>((decimal)y) : new Nullable<decimal>(); 
+Func<int, Nullable<decimal>> both = Compose(log, toDecimal);
+
+That doesn't work. toDecimal takes a double, but log returns a Nullable<double>. What do we want to happen? Clearly we want to say that the result of the composed functions is null if log returns null, and otherwise passes the underlying value along to toDecimal. But we already have a function that does precisely that: ApplySpecialFunction! And therefore we can build a monadic composition helper:
+
+static Func<X, Nullable<Z>> ComposeSpecial<X, Y, Z>(
+  Func<X, Nullable<Y>> f,
+  Func<Y, Nullable<Z>> g)
+{ 
+  return x => ApplySpecialFunction(f(x), g);
+}
+
+Now we can say:
+
+Func<int, Nullable<decimal>> both = ComposeSpecial(log, toDecimal);
+
+The ApplySpecialFunction helper method enables us to apply any function to a monadic type, which is awesome. But in doing so it also enables us to compose any two functions that return that type!
+
+I said last time that we were finally going to get to the last rule of the monad pattern, and at long last we've arrived. The last rule is: the ApplySpecialFunction helper must ensure that composition works. In code:
+
+Func<X, M<Y>> f = whatever;
+Func<Y, M<Z>> g = whatever;
+M<X> mx = whatever;
+M<Y> my = ApplySpecialFunction(mx, f);
+M<Z> mz1 = ApplySpecialFunction(my, g);
+Func<X, M<Z>> h = ComposeSpecial(f, g);
+M<Z> mz2 = ApplySpecialFunction(mx, h);
+
+We require that mz1 and mz2 be semantically the same. Applying f to some value and then applying g to the result must be logically the same as first composing f with g and then applying the composition to the value.3
+
+Finally we've got all the small details taken care of and we can correctly describe the monad pattern in C#:
+
+A monad is a generic type M<T> such that:
+
+    There is some sort of construction mechanism that takes a T and returns an M<T>. We've been characterizing this as a method with signature
+
+static M<T> CreateSimpleM<T>(T t)
+
+    Also there is some way of applying a function that takes the underlying type to a monad of that type. We've been characterizing this as a method with signature:
+
+static M<R> ApplySpecialFunction<A, R>(
+  M<A> monad, Func<A, M<R>> function)
+
+Finally, both these methods must obey the monad laws, which are:
+
+    Applying the construction function to a given instance of the monad produces a logically identical instance of the monad.
+    Applying a function to the result of the construction function on a value, and applying that function to the value directly, produces two logically identical instances of the monad.
+    Applying to a value a first function followed by applying to the result a second function, and applying to the original value a third function that is the composition of the first and second functions, produces two logically identical instances of the monad.
+
+Whew! And now perhaps you see why I started this series all those weeks ago with the idea of exploring the pattern by looking at examples, rather than starting in with the monad laws.

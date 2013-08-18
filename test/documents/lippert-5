@@ -1,0 +1,92 @@
+Last time in this series we finally worked out the actual rules for the monad pattern. The pattern in C# is that a monad is a generic type M<T> that "amplifies" the power of a type T. There is always a way to construct an M<T> from a value of T, which we characterized as the existence of a helper method:
+
+static M<T> CreateSimpleM<T>(T t)
+
+And if you have a function that takes any type A and produces an M<R> then there is a way to apply that function to an instance of M<A> in a way that still produces an M<R>. We characterized this as the existence of a helper method:
+
+static M<R> ApplySpecialFunction<A, R>(
+  M<A> wrapped,
+  Func<A, M<R>> function)
+
+Is that it? Not quite. In order to actually be a valid implementation of the monad pattern, these two helper methods need to have a few additional restrictions placed on them, to ensure that they are well-behaved. Specifically: the construction helper function can be thought of as "wrapping up" a value, and the application helper function knows how to "unwrap" a value; it seems reasonable that we require that wrapping and unwrapping operations preserve the value.
+
+With that in mind, we notice that ApplySpecialFunction takes as its second argument a function from A to M<R>, for any A and any R. But CreateSimpleM is a function from T to M<T>, and is therefore a possible argument to ApplySpecialFunction! Suppose we have: 1
+
+static Nullable<T> CreateSimpleNullable<T>(T t)
+{
+  return new Nullable<T>(t);
+}
+static Nullable<R> ApplySpecialFunction<A, R>(
+  Nullable<A> nullable,
+  Func<A, Nullable<R>> function)
+{
+  return nullable.HasValue ?
+    function(nullable.Value) : 
+    new Nullable<R>();
+}
+
+And then we notice that CreateSimpleNullable has the correct signature to be passed as the second argument to ApplySpecialFunction:
+
+Nullable<int> original = Whatever();
+Nullable<int> result = ApplySpecialFunction(original, CreateSimpleNullable);
+
+Work your way through what happens here. If original is null then we get null back out. If original has a value, say, 12, then we unwrap it, pass it to MakeSimpleNullable, and get a wrapped 12 back out! The rule is:
+
+Applying the "make a simple wrapper around this value" function to a monad value must produce the same monad value.
+
+And in this case we actually have value identity. Now, I note that we are not requiring referential identity here, should the monadic type happen to be a reference type. Let's consider our OnDemand<T> monad:
+
+static OnDemand<T> CreateSimpleOnDemand<T>(T t)
+{
+  return () => t;
+}
+static OnDemand<R> ApplySpecialFunction<A, R>(
+  OnDemand<A> onDemand,
+  Func<A, OnDemand<R>> function)
+{
+  return ()=>function(onDemand())();
+}
+
+If we have
+
+OnDemand<int> original = () => DateTime.Now.Seconds;
+OnDemand<int> result = ApplySpecialFunction(original, CreateSimpleOnDemand);
+
+Then original and result are certainly not reference equal. But both original and result do the same thing: when you call them, they tell you what the current second is. The latter unfortunately jumps through several unnecessary hoops in order to do so, but it gets there in the end.
+
+In some implementations of the monad pattern it might be cheap and easy to ensure that the two instances be referentially identical, and obviously that would be great. But all that is actually required is that the original and resulting instances be semantically identical when the simple construction function is applied to an existing monad.
+
+The next restriction is that the "simple wrapper around a value" actually act like a simple wrapper around a value. But how can that be precisely characterized? Easily enough with the two helper methods we have. Let's look at an example. Recall that we had a SafeLog method:
+
+static Nullable<double> SafeLog(int value) { ... }
+
+Now suppose we had:
+
+int original = 123;
+Nullable<double> result1 = SafeLog(original);
+Nullable<int> nullable = CreateSimpleNullable(original);
+Nullable<double> result2 = ApplySpecialFunction(nullable, SafeLog);
+
+You would expect that result1 and result2 would be the same nullable double, right? If Nullable<int> is just a simple wrapper around an int then applying a function to it should be just the same as applying the function to the original integer value. We can generalize this rule and say that the result of applying a special function to an value, and to the same value "wrapped up in a monad", must be the same. 2
+
+OK, so let's once again sum up. The rules of the monad pattern are that a monadic type M<T> provides operations that are logically equivalent to methods:
+
+static M<T> CreateSimpleM<T>(T t) { ... }
+static M<R> ApplySpecialFunction<A, R>(
+  M<A> monad, Func<A, M<R>> function) {...}
+
+subject to the restrictions that:
+
+ApplySpecialFunction(someMonadValue, CreateSimpleM)
+
+results in a value logically identical to someMonadValue, and that
+
+ApplySpecialFunction(CreateSimpleM(someValue), someFunction)
+
+results in a value logically identical to
+
+someFunction(someValue)
+
+Are we done yet? Please?
+
+Sigh. No. We are still missing one rule of the monad pattern but I promise, this is the last one. Next time on FAIC we'll discuss the nature of programming, and, for that matter, all problem solving, and then see how the monad pattern fits into that. Along the way we'll deduce the last rule.

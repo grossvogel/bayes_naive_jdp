@@ -1,0 +1,25 @@
+Last time on FAIC we managed to finally state the rules of the monad pattern; of course, we've known for some time that the key parts of the pattern are the constructor helper, which we've been calling CreateSimpleM<T> and the function application helper, which we've been calling ApplySpecialFunction<A, R>. Needless to say, these are not the standard names for these functions. 1
+
+The traditional name for the constructor function is "unit", which I suppose makes some sense. In Haskell, a purely functional programming language that makes heavy use of monads, the unit function is called return, for reasons which are a bit tricky to explain without a background in Haskell.2 In C# there is no particular standard. Of the five monadic types we've been using as examples, there are five different ways to construct a monad instance from a simple value:
+
+Nullable<int> nullable = new Nullable<int>(123);
+Task<int> task = Task.FromResult<int>(123);
+Lazy<int> lazy = new Lazy<int>(() => 123);
+OnDemand<int> onDemand = () => 123;
+IEnumerable<int> sequence = Enumerable.Repeat<int>(123, 1);
+
+And frankly, that last one is a bit dodgy. I wish there was a static method on Enumerable specifically for making a one-element sequence.
+
+The traditional name for the "function application" helper is "bind". In Haskell the bind function is actually an infix3 operator; in Haskell to apply a function f to an instance of a monad m, you'd say m >>= f. In C# the bind function is usually not provided explicitly and therefore usually does not have a name.4
+
+"Unit" makes some sense but what on earth could "bind" mean? And what's with that crazy Haskell syntax?
+
+You might have noticed that the asynchronous, lazy, on-demand and sequence monads all have an interesting common property: when you apply a function to any of these monads, what you get back is an object that will perform that function in the future. Essentially, the bind function takes an immutable workflow and its subsequent step, and returns you the resulting new workflow. So m >>= f  means "bind operation f onto the end of workflow m and give me the resulting new workflow". The Haskell syntax is actually quite appropriate; you get the sense that the workflow is feeding its result into the next function.
+
+Let's be clear on this: the bind operation takes a workflow and a function and gives you back a new workflow that feeds the result of the original workflow into the new function when the new workflow is executed. The bind operator does not execute the workflow; it makes a new workflow out of an old one.5
+
+How those workflows are actually executed depends on the semantics of the monad, of course. A portion of the workflow of the sequence monad is activated whenever MoveNext is called, and it executes until the next value in the sequence can be computed. The workflow of the lazy monad is activated the first time the Value property is fetched; after that, it uses the cached value. The workflow of the on-demand monad is activated by invoking the delegate. And the workflow of the asynchronous monad is activated... well, whenever the task is scheduled to execute!
+
+That is the whole point of those particular monads: they represent a bunch of work that is to be done and the order in which to do it. By contrast, the far simpler nullable monad6 doesn't represent a workflow to be performed in the future. Rather, it represents the association of extra state -- a single Boolean -- with a value. Computations performed on it are done so "eagerly" rather than being deferred until the future.
+
+Next time on FAIC: I'm the special guest on the StackExchange podcast, so we'll digress briefly. When we continue the series we'll come up with a few ad hoc examples of "state" monads to explore this concept further.

@@ -1,0 +1,17 @@
+Though we've exchanged a few emails over the years, I've only met Joel Spolsky once, back in 2005, and since he was surrounded by a protective layer of adoring fanboys we didn't get to chat much. So it was a genuine pleasure to finally spend the better part of an hour chatting with Joel, David, Jay and Alex - them in New York, me in Seattle, Skype is a wonderful thing. If you like long, rambling conversations full of obscure facts about old programming languages, you could do worse than this podcast. The link to the podcast post is here.
+
+A few supplemental links for some of the topics we cover:
+
+    The WATFIV FORTRAN compiler and the Waterloo BASIC chip that shipped on the SuperPET 90001 were technically not actually written at WATCOM because WATCOM wasn't a company until 1981. However, WATCOM was formed out of the Computer Systems Group at the University of Waterloo and inherited a bunch of the software written there.
+    I talked about IDispatch default property semantics here. I document some corner cases in VBScript default property semantics here. I mentioned that I left some detailed comments about those features in the VBScript IntelliSense code in Visual InterDev; you can read one of those comments here.
+    Some details on VBScript's wacky error handling mechansisms are here.
+    I mentioned that "soft" vs "hard" types change the comparison semantics of VBScript. Details here.
+    If you pass a variable containing an object to an out-only COM method from VBScript, the object will leak.
+    What do you mean, I can't use parentheses when calling a sub?
+    Whose Line? and StackOverflow have something in common: everything is made up and the points don't matter.
+    Answering questions is a great way to become a recognized expert.
+    I didn't mention this during the podcast, but if you want a good overview of what are the challenges of making a static analyzer that is good enough to sell for money, this article is excellent.
+    What was that throwaway line about programming on a boat all about?
+    My article on unsafe array covariance is here.
+    Joel On Turtles.
+    My post about me and fellow programmer Ryan Gosling.
