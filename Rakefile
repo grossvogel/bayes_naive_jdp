@@ -3,6 +3,31 @@ require 'rubygems'
 require 'rake'
 require 'date'
 
+#################################################################################
+#
+#	Some utilities to find out info about the package
+#
+#################################################################################
+
+def name
+	@name ||= Dir['*.gemspec'].first.split('.').first
+end
+
+def version
+	line = File.read("lib/#{name}/version.rb")[/^\s*VERSION\s*=\s*.*/]
+	line.match(/.*VERSION\s*=\s*['"](.*)['"]/)[1]
+end
+
+def gemspec_file 
+	"#{name}.gemspec"
+end
+
+#################################################################################
+#
+#	Tasks
+#
+#################################################################################
+
 desc "Run the tests"
 task :default => :test
 
@@ -10,20 +35,28 @@ require 'rake/testtask'
 Rake::TestTask.new(:test) do |test|
   test.verbose = true
 end
-
-desc "Validate the gemspec"
-task :gemspec do
-  gemspec.validate
-end
  
 desc "Build gem locally"
-task :build => :gemspec do
-  system "gem build #{gemspec.name}.gemspec"
+task :build => :validate do
+  system "gem build #{name}.gemspec"
   FileUtils.mkdir_p "pkg"
-  FileUtils.mv "#{gemspec.name}-#{gemspec.version}.gem", "pkg"
+  FileUtils.mv "#{name}-#{version}.gem", "pkg"
 end
  
 desc "Install gem locally"
 task :install => :build do
-  system "gem install pkg/#{gemspec.name}-#{gemspec.version}"
+  system "gem install pkg/#{name}-#{version}"
+end
+
+desc "Validate #{gemspec_file}"
+task :validate do
+  libfiles = Dir['lib/*'] - ["lib/#{name}.rb", "lib/#{name}"]
+  unless libfiles.empty?
+    puts "Directory `lib` should only contain a `#{name}.rb` file and `#{name}` dir."
+    exit!
+  end
+  unless Dir['VERSION*'].empty?
+    puts "A `VERSION` file at root level violates Gem best practices."
+    exit!
+  end
 end

@@ -8,7 +8,13 @@ Gem::Specification.new do |spec|
   spec.version       = BayesNaiveJdp::VERSION
   spec.authors       = ["Jason Pollentier"]
   spec.email         = ["pollentj@gmail.com"]
-  spec.description   = %q{A very simple naive Bayesian classifier.}
+  spec.description   = %q{A very simple naive Bayesian classifier. 
+  	I'm just using it as practice as I learn how to package ruby code.
+	The algorithm used here is not original, but an adaptation from Burak Kanber's 
+	Machine Learning in Javascript series.
+
+	http://readable.cc/feed/view/34236/burak-kanber-s-blog	
+}
   spec.summary       = %q{A very simple naive Bayesian classifier.}
   spec.homepage      = ""
   spec.license       = "MIT"
