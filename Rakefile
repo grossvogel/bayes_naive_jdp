@@ -22,6 +22,10 @@ def gemspec_file
 	"#{name}.gemspec"
 end
 
+def gem_file
+	"pkg/#{name}-#{version}.gem"
+end
+
 #################################################################################
 #
 #	Tasks
@@ -40,12 +44,17 @@ desc "Build gem locally"
 task :build => :validate do
   system "gem build #{name}.gemspec"
   FileUtils.mkdir_p "pkg"
-  FileUtils.mv "#{name}-#{version}.gem", "pkg"
+  FileUtils.mv "#{name}-#{version}.gem", gem_file 
+end
+
+desc "Publish the gem to rubygems.org"
+task :publish => :build do
+  system "gem push #{gem_file}"
 end
  
 desc "Install gem locally"
 task :install => :build do
-  system "gem install pkg/#{name}-#{version}"
+  system "gem install #{gem_file}"
 end
 
 desc "Validate #{gemspec_file}"
